@@ -1,0 +1,19 @@
+[package]
+name = "constgebra"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/knickish/constgebra"
+description = "Const Linear Algebra"
+
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+const_soft_float = "0.1.1"
+
+[patch.crates-io]
+const_soft_float = {git = "http://www.github.com/knickish/const_soft_float.git", rev = "17cf66a"}
+
+[dev-dependencies]
+pretty_assertions = "1"
