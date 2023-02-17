@@ -1,3 +1,6 @@
+#![allow(clippy::needless_range_loop)]
+#![allow(clippy::erasing_op)]
+
 use std::{
     cmp::{max, min},
     fmt::Display,
@@ -56,15 +59,15 @@ struct Matrix {
 
 impl Display for Matrix {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "[\n")?;
+        writeln!(f, "[")?;
         for row in 0..self.rows {
             write!(f, "\t")?;
             for column in 0..self.columns {
                 write!(f, "{:10.5e}, ", self.vals[row * self.columns + column])?;
             }
-            write!(f, "\n")?;
+            writeln!(f)?;
         }
-        write!(f, "]\n")?;
+        writeln!(f, "]")?;
         Ok(())
     }
 }
@@ -175,24 +178,21 @@ impl Matrix {
             }
         }
 
-        let tmp = self.rows;
-        self.rows = self.columns;
-        self.columns = tmp;
+        std::mem::swap(&mut self.rows, &mut self.columns);
         self.vals = ret;
     }
 
     #[cfg(test)]
     fn retain_non_zero_rows(&mut self) {
         self.vals = {
-            let ref mut chained: Vec<&f64> = Vec::new();
+            let chained: &mut Vec<&f64> = &mut Vec::new();
             {
                 let mut starts = self
                     .vals
                     .iter()
                     .enumerate()
                     .step_by(self.columns)
-                    .map(|(idx, _)| idx)
-                    .into_iter();
+                    .map(|(idx, _)| idx);
                 let (val_ref, columns) = (&self.vals, self.columns);
                 let _: Vec<()> = std::iter::from_fn(|| match starts.next() {
                     Some(idx) => {
@@ -209,7 +209,7 @@ impl Matrix {
                 .collect();
             }
 
-            chained.into_iter().map(|x| **x).collect()
+            chained.iter_mut().map(|x| **x).collect()
         };
         self.rows = self.vals.len() / self.columns;
     }
@@ -285,8 +285,7 @@ impl Matrix {
                     let f = self.vals[i * self.columns + k] / self.vals[h * self.columns + k];
                     self.vals[i * self.columns + k] = 0.0;
                     for j in (k + 1)..n {
-                        self.vals[i * self.columns + j] =
-                            self.vals[i * self.columns + j] - self.vals[h * self.columns + j] * f;
+                        self.vals[i * self.columns + j] -= self.vals[h * self.columns + j] * f;
                     }
                 }
                 h += 1;
@@ -341,7 +340,7 @@ impl Matrix {
         }
 
         let size_diff = dbg!(new_square_size - old_square_size);
-        let mut ret: Vec<f64> = vec![0.0; base.into()];
+        let mut ret: Vec<f64> = vec![0.0; base];
         for i in 0..new_square_size {
             for j in 0..new_square_size {
                 if i >= size_diff && j >= size_diff {
@@ -370,7 +369,7 @@ impl Matrix {
         }
 
         let size_diff = old_square_size - new_square_size;
-        let mut ret: Vec<f64> = vec![0.0; (base * 4).into()];
+        let mut ret: Vec<f64> = vec![0.0; base * 4];
         for i in 0..new_square_size {
             for j in 0..new_square_size {
                 ret[i * new_square_size + j] =
@@ -633,26 +632,24 @@ impl Matrix {
                     (0.0, 1.0)
                 } else {
                     let mut c_vec = [0.0; 4];
-                    c_vec[0 * 2 + 0] = s_working.get(n - 2, n - 2) * s_working.get(n - 2, n - 2);
+                    c_vec[0 * 2] = s_working.get(n - 2, n - 2) * s_working.get(n - 2, n - 2);
                     if n - k0 > 2 {
-                        c_vec[0 * 2 + 0] +=
-                            s_working.get(n - 3, n - 2) * s_working.get(n - 3, n - 2);
+                        c_vec[0 * 2] += s_working.get(n - 3, n - 2) * s_working.get(n - 3, n - 2);
                     }
-                    c_vec[0 * 2 + 1] = s_working.get(n - 2, n - 2) * s_working.get(n - 2, n - 1);
-                    c_vec[1 * 2 + 0] = s_working.get(n - 2, n - 2) * s_working.get(n - 2, n - 1);
-                    c_vec[1 * 2 + 1] = s_working.get(n - 1, n - 1) * s_working.get(n - 1, n - 1)
+                    c_vec[1] = s_working.get(n - 2, n - 2) * s_working.get(n - 2, n - 1);
+                    c_vec[2] = s_working.get(n - 2, n - 2) * s_working.get(n - 2, n - 1);
+                    c_vec[2 + 1] = s_working.get(n - 1, n - 1) * s_working.get(n - 1, n - 1)
                         + s_working.get(n - 2, n - 1) * s_working.get(n - 2, n - 1);
 
                     let (b, d) = {
-                        let mut b = -(c_vec[0 * 2 + 0] + c_vec[1 * 2 + 1]) / 2.0;
-                        let mut c = c_vec[0 * 2 + 0] * c_vec[1 * 2 + 1]
-                            - c_vec[0 * 2 + 1] * c_vec[1 * 2 + 0];
+                        let mut b = -(c_vec[0 * 2] + c_vec[2 + 1]) / 2.0;
+                        let mut c = c_vec[0 * 2] * c_vec[2 + 1] - c_vec[1] * c_vec[2];
                         let mut d = 0.0;
                         if (b.powi(2) - c).abs() > eps * b.powi(2) {
                             d = (b.powi(2) - c).sqrt();
                         } else {
-                            b = (c_vec[0 * 2 + 0] - c_vec[1 * 2 + 1]) / 2.0;
-                            c = -c_vec[0 * 2 + 1] * c_vec[1 * 2 + 0];
+                            b = (c_vec[0 * 2] - c_vec[2 + 1]) / 2.0;
+                            c = -c_vec[1] * c_vec[2];
                             if b * b - c > 0.0 {
                                 d = (b * b - c).sqrt();
                             }
@@ -663,8 +660,8 @@ impl Matrix {
                     let lambda1 = -b + d;
                     let lambda2 = -b - d;
 
-                    let d1 = (lambda1 - c_vec[1 * 2 + 1]).abs();
-                    let d2 = (lambda2 - c_vec[1 * 2 + 1]).abs();
+                    let d1 = (lambda1 - c_vec[2 + 1]).abs();
+                    let d2 = (lambda2 - c_vec[2 + 1]).abs();
                     let mu = if d1 < d2 { lambda1 } else { lambda2 };
 
                     let alpha = s_working.get(k0, k0).powi(2) - dbg!(mu);
@@ -676,8 +673,6 @@ impl Matrix {
                 let mut alpha = alpha;
                 let mut beta = beta;
                 for k in k0..(n - 1) {
-                    // let dimU = [dim[0], dim[0]];
-                    // let dimV = [dim[1], dim[1]];
                     s_working.givens_r(k, alpha, beta);
                     v_working.givens_l(k, alpha, beta);
 
@@ -851,13 +846,7 @@ mod tests {
     fn float_equal(one: f64, two: f64) -> bool {
         match (one, two) {
             (a, b) if (a - b).abs() < Matrix::EPSILON => true,
-            (a, b) if a == -0.0 || b == -0.0 => {
-                if a + b == 0.0 || -(a + b) == 0.0 {
-                    true
-                } else {
-                    false
-                }
-            }
+            (a, b) if a == -0.0 || b == -0.0 => a + b == 0.0 || -(a + b) == 0.0,
             _ => false,
         }
     }
@@ -883,22 +872,20 @@ mod tests {
                         dbg!(j, i, check.get(j, i));
                         return false;
                     }
-                } else {
-                    if let false = float_equal(check.get(j, i), 0.0) {
-                        dbg!(j, i, check.get(j, i));
-                        return false;
-                    }
+                } else if let false = float_equal(check.get(j, i), 0.0) {
+                    dbg!(j, i, check.get(j, i));
+                    return false;
                 }
             }
         }
-        return true;
+        true
     }
 
     #[test]
     fn test_2_x_2_invert() {
         let vals = vec![4.0, 7.0, 2.0, 6.0];
         let inv_given = vec![0.6, -0.7, -0.2, 0.4];
-        let inv = pseudo_invert(vals.clone(), 2);
+        let inv = pseudo_invert(vals, 2);
 
         // let mut tmp = Matrix::new(vals, 2);
         // tmp.svd(2, 2, 2, f64::EPSILON);
@@ -936,22 +923,22 @@ mod tests {
             15.0,
         ];
         let inv_given = vec![
-            0.0053046525209266107335,
-            -0.053014080851339951963,
-            0.043653883589643760947,
-            0.029232366491467133877,
-            -0.072318473817403153419,
-            0.004087989098695736796,
-            -0.044675880864317695146,
-            0.093829083122445006786,
-            0.077331127116994354671,
-            -0.029719031860359483483,
-            0.0033579910453572123787,
-            -0.023392382064758938417,
-            0.018931282849912400217,
-            0.11355525274154824475,
-            0.0090033093245084679753,
-            -0.11585880215430536628,
+            0.005_304_652_520_926_611,
+            -0.053_014_080_851_339_955,
+            0.043_653_883_589_643_76,
+            0.029_232_366_491_467_134,
+            -0.072_318_473_817_403_15,
+            0.004_087_989_098_695_737,
+            -0.044_675_880_864_317_695,
+            0.093_829_083_122_445,
+            0.077_331_127_116_994_36,
+            -0.029_719_031_860_359_485,
+            0.003_357_991_045_357_212,
+            -0.023_392_382_064_758_938,
+            0.018_931_282_849_912_4,
+            0.113_555_252_741_548_25,
+            0.009_003_309_324_508_468,
+            -0.115_858_802_154_305_37,
         ];
         let inv = pseudo_invert_square(vals);
         for i in 0..inv_given.len() {
@@ -1099,7 +1086,7 @@ mod tests {
         }
 
         //self * inverse = identity
-        let mut l = Matrix::new(vals.clone(), 8);
+        let mut l = Matrix::new(vals, 8);
         let mut r = Matrix::new(inv, 8);
         l.fill_identity();
         r.fill_identity();
@@ -1210,7 +1197,7 @@ mod tests {
             0.0, 0.0,
         ];
 
-        let inv = dbg!(pseudo_invert(vals.clone(), 12));
+        let inv = dbg!(pseudo_invert(vals, 12));
         for i in 0..inv_given.len() {
             assert!(float_equal(inv[i], inv_given[i]))
         }

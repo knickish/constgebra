@@ -1,3 +1,6 @@
+#![allow(clippy::needless_range_loop)]
+#![allow(clippy::erasing_op)]
+
 use const_soft_float::soft_f64::SoftF64 as Sf64;
 
 #[derive(Clone, PartialEq, PartialOrd, Copy)]
@@ -342,8 +345,6 @@ impl<const R: usize, const C: usize> SMatrix<R, C> {
             }
 
             self.gemm(&vt_out, &u_out, 1.0, 0.0).transpose()
-        } else if self.rows() > self.columns() {
-            panic!("Non-square matrices not yet supported");
         } else {
             panic!("Non-square matrices not yet supported");
         }
@@ -590,31 +591,27 @@ impl<const R: usize, const C: usize> SMatrix<R, C> {
                     (Sf64(0.0), Sf64(1.0))
                 } else {
                     let mut c_vec = [Sf64(0.0); 4];
-                    c_vec[0 * 2 + 0] = s_working.get(n - 2, n - 2).mul(s_working.get(n - 2, n - 2));
+                    c_vec[0 * 2] = s_working.get(n - 2, n - 2).mul(s_working.get(n - 2, n - 2));
                     if n - k0 > 2 {
-                        c_vec[0 * 2 + 0] = c_vec[0 * 2 + 0]
+                        c_vec[0 * 2] = c_vec[0 * 2]
                             .add(s_working.get(n - 3, n - 2).mul(s_working.get(n - 3, n - 2)));
                     }
-                    c_vec[0 * 2 + 1] = s_working.get(n - 2, n - 2).mul(s_working.get(n - 2, n - 1));
-                    c_vec[1 * 2 + 0] = s_working.get(n - 2, n - 2).mul(s_working.get(n - 2, n - 1));
-                    c_vec[1 * 2 + 1] = s_working
+                    c_vec[1] = s_working.get(n - 2, n - 2).mul(s_working.get(n - 2, n - 1));
+                    c_vec[2] = s_working.get(n - 2, n - 2).mul(s_working.get(n - 2, n - 1));
+                    c_vec[2 + 1] = s_working
                         .get(n - 1, n - 1)
                         .mul(s_working.get(n - 1, n - 1))
                         .add(s_working.get(n - 2, n - 1).mul(s_working.get(n - 2, n - 1)));
 
                     let (b, d) = {
-                        let mut b = (c_vec[0 * 2 + 0].add(c_vec[1 * 2 + 1]))
-                            .neg()
-                            .div(Sf64(2.0));
-                        let mut c = c_vec[0 * 2 + 0]
-                            .mul(c_vec[1 * 2 + 1])
-                            .sub(c_vec[0 * 2 + 1].mul(c_vec[1 * 2 + 0]));
+                        let mut b = (c_vec[0 * 2].add(c_vec[2 + 1])).neg().div(Sf64(2.0));
+                        let mut c = c_vec[0 * 2].mul(c_vec[2 + 1]).sub(c_vec[1].mul(c_vec[2]));
                         let mut d = Sf64(0.0);
                         if gt(abs(b.powi(2).sub(c)), eps.mul(b.powi(2))) {
                             d = (b.powi(2).sub(c)).sqrt();
                         } else {
-                            b = c_vec[0 * 2 + 0].sub((c_vec[1 * 2 + 1]).div(Sf64(2.0)));
-                            c = c_vec[0 * 2 + 1].neg().mul(c_vec[1 * 2 + 0]);
+                            b = c_vec[0 * 2].sub((c_vec[2 + 1]).div(Sf64(2.0)));
+                            c = c_vec[1].neg().mul(c_vec[2]);
                             if gt(b.mul(b).sub(c), Sf64(0.0)) {
                                 d = (b.mul(b).sub(c)).sqrt();
                             }
@@ -626,8 +623,8 @@ impl<const R: usize, const C: usize> SMatrix<R, C> {
                     let lambda1 = b.neg().add(d);
                     let lambda2 = b.neg().sub(d);
 
-                    let d1 = abs(lambda1.sub(c_vec[1 * 2 + 1]));
-                    let d2 = abs(lambda2.sub(c_vec[1 * 2 + 1]));
+                    let d1 = abs(lambda1.sub(c_vec[2 + 1]));
+                    let d2 = abs(lambda2.sub(c_vec[2 + 1]));
                     let mu = if lt(d1, d2) { lambda1 } else { lambda2 };
 
                     let alpha = s_working.get(k0, k0).powi(2).sub(mu);
@@ -720,7 +717,7 @@ const fn is_zero(mut arg: Sf64) -> bool {
         arg = arg.mul(Sf64(2.0));
         i += 1;
     }
-    return true;
+    true
 }
 
 const fn abs(x: Sf64) -> Sf64 {
@@ -737,40 +734,28 @@ const fn gt(x: Sf64, y: Sf64) -> bool {
     let Some(cmp) = x.cmp(y) else {
         panic!("failed to compare values")
     };
-    match cmp {
-        std::cmp::Ordering::Greater => true,
-        _ => false,
-    }
+    matches!(cmp, std::cmp::Ordering::Greater)
 }
 
 const fn lt(x: Sf64, y: Sf64) -> bool {
     let Some(cmp) = x.cmp(y) else {
         panic!("failed to compare values")
     };
-    match cmp {
-        std::cmp::Ordering::Less => true,
-        _ => false,
-    }
+    matches!(cmp, std::cmp::Ordering::Less)
 }
 
 const fn le(x: Sf64, y: Sf64) -> bool {
     let Some(cmp) = x.cmp(y) else {
         panic!("failed to compare values")
     };
-    match cmp {
-        std::cmp::Ordering::Less | std::cmp::Ordering::Equal => true,
-        _ => false,
-    }
+    matches!(cmp, std::cmp::Ordering::Less | std::cmp::Ordering::Equal)
 }
 
 const fn eq(x: Sf64, y: Sf64) -> bool {
     let Some(cmp) = x.cmp(y) else {
         panic!("failed to compare values")
     };
-    match cmp {
-        std::cmp::Ordering::Equal => true,
-        _ => false,
-    }
+    matches!(cmp, std::cmp::Ordering::Equal)
 }
 
 #[cfg(test)]
@@ -780,13 +765,7 @@ mod const_tests {
     fn float_equal(one: f64, two: f64, eps: f64) -> bool {
         match (one, two) {
             (a, b) if (a - b).abs() < eps => true,
-            (a, b) if a == -0.0 || b == -0.0 => {
-                if a + b == 0.0 || -(a + b) == 0.0 {
-                    true
-                } else {
-                    false
-                }
-            }
+            (a, b) if a == -0.0 || b == -0.0 => a + b == 0.0 || -(a + b) == 0.0,
             _ => false,
         }
     }
@@ -828,28 +807,28 @@ mod const_tests {
         ];
         const EXPECTED: [[f64; 4]; 4] = [
             [
-                0.0053046525209266107335,
-                -0.053014080851339951963,
-                0.043653883589643760947,
-                0.029232366491467133877,
+                0.005_304_652_520_926_611,
+                -0.053_014_080_851_339_955,
+                0.043_653_883_589_643_76,
+                0.029_232_366_491_467_134,
             ],
             [
-                -0.072318473817403153419,
-                0.004087989098695736796,
-                -0.044675880864317695146,
-                0.093829083122445006786,
+                -0.072_318_473_817_403_15,
+                0.004_087_989_098_695_737,
+                -0.044_675_880_864_317_695,
+                0.093_829_083_122_445,
             ],
             [
-                0.077331127116994354671,
-                -0.029719031860359483483,
-                0.0033579910453572123787,
-                -0.023392382064758938417,
+                0.077_331_127_116_994_36,
+                -0.029_719_031_860_359_485,
+                0.003_357_991_045_357_212,
+                -0.023_392_382_064_758_938,
             ],
             [
-                0.018931282849912400217,
-                0.11355525274154824475,
-                0.0090033093245084679753,
-                -0.11585880215430536628,
+                0.018_931_282_849_912_4,
+                0.113_555_252_741_548_25,
+                0.009_003_309_324_508_468,
+                -0.115_858_802_154_305_37,
             ],
         ];
         const INVERSE: [[f64; 4]; 4] = SMatrix::new(START).pinv(f64::EPSILON).finish();
