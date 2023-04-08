@@ -3,10 +3,22 @@
 
 use const_soft_float::soft_f64::SoftF64 as Sf64;
 
+/// A `const` matrix type, with dimensions checked at compile time
+/// for all operations.
 #[derive(Clone, PartialEq, PartialOrd, Copy)]
-pub struct SMatrix<const R: usize, const C: usize>([[Sf64; C]; R]);
+pub struct CMatrix<const R: usize, const C: usize>([[Sf64; C]; R]);
 
-impl<const R: usize, const C: usize> SMatrix<R, C> {
+impl<const R: usize, const C: usize> CMatrix<R, C> {
+    /// Create a `CMatrix` from a 2D array of `f64`.
+    /// ```rust
+    /// # use constgebra::CMatrix;
+    /// const ARRAY: [[f64; 2]; 2] = [
+    ///     [4.0, 7.0],
+    ///     [2.0, 6.0]
+    /// ];
+    ///
+    /// const CMATRIX: CMatrix::<2, 2> = CMatrix::new(ARRAY);
+    /// ```
     pub const fn new(vals: [[f64; C]; R]) -> Self {
         let mut ret = [[Sf64(0.0); C]; R];
 
@@ -19,9 +31,23 @@ impl<const R: usize, const C: usize> SMatrix<R, C> {
             }
             i += 1
         }
-        SMatrix(ret)
+        CMatrix(ret)
     }
 
+    /// Converts a `CMatrix` back into a two-dimensional array.
+    /// ```rust
+    /// # use constgebra::CMatrix;
+    /// const ARRAY: [[f64; 2]; 2] = [
+    ///     [4.0, 7.0],
+    ///     [2.0, 6.0]
+    /// ];
+    ///
+    /// const CMATRIX: CMatrix::<2, 2> = CMatrix::new(ARRAY);
+    ///
+    /// const RESULT: [[f64; 2]; 2] = CMATRIX.finish();
+    ///
+    /// assert_eq!(ARRAY, RESULT)
+    /// ```
     pub const fn finish(self) -> [[f64; C]; R] {
         let mut ret = [[0.0; C]; R];
 
@@ -57,9 +83,38 @@ impl<const R: usize, const C: usize> SMatrix<R, C> {
         }
     }
 
-    pub const fn mul<const OC: usize>(self, rhs: SMatrix<C, OC>) -> SMatrix<R, OC> {
-        let mut i = 0;
+    /// Multiply two `CMatrix` and return the result. Columns
+    /// of self and rows of multiplier must agree in number.
+    ///```rust
+    /// # use constgebra::CMatrix;
+    /// const LEFT: CMatrix<4, 3> = CMatrix::new([
+    ///     [1.0, 0.0, 1.0],
+    ///     [2.0, 1.0, 1.0],
+    ///     [0.0, 1.0, 1.0],
+    ///     [1.0, 1.0, 2.0],
+    /// ]);
+    ///
+    /// const RIGHT: CMatrix<3, 3> = CMatrix::new([
+    ///     [1.0, 2.0, 1.0],
+    ///     [2.0, 3.0, 1.0],
+    ///     [4.0, 2.0, 2.0]
+    /// ]);
+    ///
+    /// const EXPECTED: [[f64; 3]; 4] = [
+    ///     [5.0, 4.0, 3.0],
+    ///     [8.0, 9.0, 5.0],
+    ///     [6.0, 5.0, 3.0],
+    ///     [11.0, 9.0, 6.0],
+    /// ];
+    ///
+    /// const RESULT: [[f64; 3]; 4] = LEFT.mul(RIGHT).finish();
+    ///
+    /// assert_eq!(EXPECTED, RESULT);
+    /// ```
+    pub const fn mul<const OC: usize>(self, rhs: CMatrix<C, OC>) -> CMatrix<R, OC> {
         let mut ret = [[Sf64(0.0); OC]; R];
+
+        let mut i = 0;
         while i < R {
             let mut j = 0;
             while j < OC {
@@ -74,9 +129,34 @@ impl<const R: usize, const C: usize> SMatrix<R, C> {
             }
             i += 1;
         }
-        SMatrix(ret)
+        CMatrix(ret)
     }
 
+    /// Add two `CMatrix` and return the result.
+    /// ```rust
+    /// # use constgebra::CMatrix;
+    /// const LEFT: CMatrix<3, 3> = CMatrix::new([
+    ///     [1.0, 0.0, 1.0],
+    ///     [2.0, 1.0, 1.0],
+    ///     [0.0, 1.0, 1.0]]
+    /// );
+    ///
+    /// const RIGHT: CMatrix<3, 3> = CMatrix::new([
+    ///     [1.0, 2.0, 1.0],
+    ///     [2.0, 3.0, 1.0],
+    ///     [4.0, 2.0, 2.0]]
+    /// );
+    ///
+    /// const EXPECTED: [[f64; 3]; 3] = [
+    ///     [2.0, 2.0, 2.0],
+    ///     [4.0, 4.0, 2.0],
+    ///     [4.0, 3.0, 3.0]
+    /// ];
+    ///
+    /// const RESULT: [[f64; 3]; 3] = LEFT.add(RIGHT).finish();
+    ///
+    /// assert_eq!(EXPECTED, RESULT);
+    ///```
     pub const fn add(self, rhs: Self) -> Self {
         let mut ret = [[Sf64(0.0); C]; R];
 
@@ -89,21 +169,47 @@ impl<const R: usize, const C: usize> SMatrix<R, C> {
             }
             i += 1;
         }
-        SMatrix(ret)
+        CMatrix(ret)
     }
 
+    /// Subtract two `CMatrix` and return the result.
+    /// ```rust
+    /// # use constgebra::CMatrix;
+    /// const LEFT: CMatrix<3, 3> = CMatrix::new([
+    ///     [1.0, 2.0, 1.0],
+    ///     [2.0, 3.0, 1.0],
+    ///     [4.0, 2.0, 2.0]]
+    /// );
+    ///
+    /// const RIGHT: CMatrix<3, 3> = CMatrix::new([
+    ///     [1.0, 0.0, 1.0],
+    ///     [2.0, 1.0, 1.0],
+    ///     [0.0, 1.0, 1.0]]
+    /// );
+    ///
+    /// const EXPECTED: [[f64; 3]; 3] = [
+    ///     [0.0, 2.0, 0.0],
+    ///     [0.0, 2.0, 0.0],
+    ///     [4.0, 1.0, 1.0]
+    /// ];
+    ///
+    /// const RESULT: [[f64; 3]; 3] = LEFT.sub(RIGHT).finish();
+    ///
+    /// assert_eq!(EXPECTED, RESULT);
+    ///```
     pub const fn sub(self, rhs: Self) -> Self {
-        let mut i = 0;
         let mut ret = [[Sf64(0.0); C]; R];
+
+        let mut i = 0;
         while i < R {
             let mut j = 0;
             while j < C {
-                ret[i][j] = self.0[i][j].sub(rhs.0[i * C][j]);
+                ret[i][j] = self.0[i][j].sub(rhs.0[i][j]);
                 j += 1;
             }
             i += 1;
         }
-        SMatrix(ret)
+        CMatrix(ret)
     }
 
     const fn get(&self, row: usize, column: usize) -> Sf64 {
@@ -117,7 +223,25 @@ impl<const R: usize, const C: usize> SMatrix<R, C> {
         Self(ret)
     }
 
-    const fn transpose(self) -> SMatrix<C, R> {
+    /// Return the transpose of a `CMatrix`.
+    /// ```rust
+    /// # use constgebra::CMatrix;
+    /// const START: [[f64; 2]; 2] = [
+    ///     [4.0, 7.0],
+    ///     [2.0, 6.0]
+    /// ];
+    ///
+    /// const EXPECTED: [[f64; 2]; 2] = [
+    ///     [4.0, 2.0],
+    ///     [7.0, 6.0]
+    /// ];
+    ///
+    /// const RESULT: [[f64; 2]; 2] =
+    ///     CMatrix::new(START).transpose().finish();
+    ///
+    /// assert_eq!(EXPECTED, RESULT)
+    /// ```
+    pub const fn transpose(self) -> CMatrix<C, R> {
         let mut i = 0;
         let mut ret = [[Sf64(0.0); R]; C];
         while i < R {
@@ -128,11 +252,11 @@ impl<const R: usize, const C: usize> SMatrix<R, C> {
             }
             i += 1;
         }
-        SMatrix(ret)
+        CMatrix(ret)
     }
 
     #[must_use]
-    const fn givens_l(self, m: usize, a: Sf64, b: Sf64) -> Self {
+    pub const fn givens_l(self, m: usize, a: Sf64, b: Sf64) -> Self {
         let r = (a.powi(2).add(b.powi(2))).sqrt();
         if eq(r, Sf64(0.0)) {
             return self;
@@ -163,7 +287,7 @@ impl<const R: usize, const C: usize> SMatrix<R, C> {
     }
 
     #[must_use]
-    const fn givens_r(self, m: usize, a: Sf64, b: Sf64) -> Self {
+    pub const fn givens_r(self, m: usize, a: Sf64, b: Sf64) -> Self {
         let r = (a.powi(2).add(b.powi(2))).sqrt();
         if eq(r, Sf64(0.0)) {
             return self;
@@ -195,8 +319,8 @@ impl<const R: usize, const C: usize> SMatrix<R, C> {
 
     const fn gemm<const M: usize>(
         mut self,
-        a: &SMatrix<R, M>,
-        b: &SMatrix<M, C>,
+        a: &CMatrix<R, M>,
+        b: &CMatrix<M, C>,
         alpha: f64,
         beta: f64,
     ) -> Self {
@@ -228,7 +352,8 @@ impl<const R: usize, const C: usize> SMatrix<R, C> {
         self
     }
 
-    const fn svd(self, epsilon: f64) -> SMatrix<C, R> {
+    /// Singular Value Decomposition
+    pub const fn svd(self, epsilon: f64) -> CMatrix<C, R> {
         const fn less_zero_sign(x: Sf64) -> Sf64 {
             let Some(cmp) = x.cmp(Sf64(0.0)) else {
                 panic!("failed to get sign of value")
@@ -242,13 +367,13 @@ impl<const R: usize, const C: usize> SMatrix<R, C> {
         let dim = self.get_dims();
 
         if self.rows() == self.columns() {
-            let mut s_working = SMatrix([[Sf64(0.0); R]; R]);
-            let mut u_working = SMatrix([[Sf64(0.0); R]; R]);
-            let mut v_working = SMatrix([[Sf64(0.0); R]; R]);
+            let mut s_working = CMatrix([[Sf64(0.0); R]; R]);
+            let mut u_working = CMatrix([[Sf64(0.0); R]; R]);
+            let mut v_working = CMatrix([[Sf64(0.0); R]; R]);
 
-            let mut u_out = SMatrix::new([[0.0; C]; C]);
-            let mut s_out = SMatrix::new([[0.0; R]; 1]);
-            let mut vt_out = SMatrix::new([[0.0; C]; R]);
+            let mut u_out = CMatrix::new([[0.0; C]; C]);
+            let mut s_out = CMatrix::new([[0.0; R]; 1]);
+            let mut vt_out = CMatrix::new([[0.0; C]; R]);
             {
                 let mut i = 0;
                 while i < R {
@@ -353,16 +478,11 @@ impl<const R: usize, const C: usize> SMatrix<R, C> {
     #[must_use]
     const fn svd_inner<const L: usize, const S: usize>(
         dim: [usize; 2],
-        mut u_working: SMatrix<L, L>,
-        mut s_working: SMatrix<L, S>,
-        mut v_working: SMatrix<S, S>,
+        mut u_working: CMatrix<L, L>,
+        mut s_working: CMatrix<L, S>,
+        mut v_working: CMatrix<S, S>,
         eps: Sf64,
-    ) -> (SMatrix<L, L>, SMatrix<L, S>, SMatrix<S, S>) {
-        panic_if_ne(s_working.get(0, 0), 4.0);
-        panic_if_ne(s_working.get(0, 1), 7.0);
-        panic_if_ne(s_working.get(1, 0), 2.0);
-        panic_if_ne(s_working.get(1, 1), 6.0);
-
+    ) -> (CMatrix<L, L>, CMatrix<L, S>, CMatrix<S, S>) {
         let n = S;
 
         let mut house_vec = [Sf64(0.0); L];
@@ -372,9 +492,6 @@ impl<const R: usize, const C: usize> SMatrix<R, C> {
             {
                 let x1 = abs(s_working.get(i, i));
 
-                if i == 0 {
-                    panic_if_ne(x1, 4.0)
-                };
                 let x_inv_norm = {
                     let mut x_inv_norm = Sf64(0.0);
                     let mut j = i;
@@ -691,8 +808,7 @@ impl<const R: usize, const C: usize> SMatrix<R, C> {
         (u_working, s_working, v_working)
     }
 
-    #[allow(unused)]
-    pub const fn pinv(self, epsilon: f64) -> SMatrix<C, R> {
+    pub const fn pinv(self, epsilon: f64) -> CMatrix<C, R> {
         if self.rows() * self.columns() == 0 {
             return self.transpose();
         }
@@ -701,13 +817,13 @@ impl<const R: usize, const C: usize> SMatrix<R, C> {
     }
 }
 
+#[cfg(unused)]
 const fn panic_if_ne(val: Sf64, test: f64) {
     if gt(abs(val.sub(Sf64(test))), Sf64(0.00001)) {
-        // panic!();
+        panic!();
     }
 }
 
-#[allow(unused)]
 const fn is_zero(mut arg: Sf64) -> bool {
     let mut i = 0;
     while i < 64 {
@@ -772,8 +888,8 @@ mod const_tests {
 
     #[test]
     fn test_2_x_2_example() {
-        const START: SMatrix<2, 2> = SMatrix::new([[4.0, 1.0], [2.0, 3.0]]);
-        const ADD: SMatrix<2, 2> = SMatrix::new([[0.0, 6.0], [0.0, 3.0]]);
+        const START: CMatrix<2, 2> = CMatrix::new([[4.0, 1.0], [2.0, 3.0]]);
+        const ADD: CMatrix<2, 2> = CMatrix::new([[0.0, 6.0], [0.0, 3.0]]);
         const EXPECTED: [[f64; 2]; 2] = [[0.6, -0.7], [-0.2, 0.4]];
 
         const RESULT: [[f64; 2]; 2] = START.add(ADD).pinv(f64::EPSILON).finish();
@@ -789,7 +905,7 @@ mod const_tests {
         const START: [[f64; 2]; 2] = [[4.0, 7.0], [2.0, 6.0]];
         const EXPECTED: [[f64; 2]; 2] = [[0.6, -0.7], [-0.2, 0.4]];
 
-        const RESULT: [[f64; 2]; 2] = SMatrix::new(START).pinv(f64::EPSILON).finish();
+        const RESULT: [[f64; 2]; 2] = CMatrix::new(START).pinv(f64::EPSILON).finish();
         for i in 0..2 {
             for j in 0..2 {
                 assert!(float_equal(RESULT[i][j], EXPECTED[i][j], 1e-5));
@@ -831,7 +947,7 @@ mod const_tests {
                 -0.115_858_802_154_305_37,
             ],
         ];
-        const INVERSE: [[f64; 4]; 4] = SMatrix::new(START).pinv(f64::EPSILON).finish();
+        const INVERSE: [[f64; 4]; 4] = CMatrix::new(START).pinv(f64::EPSILON).finish();
         for i in 0..4 {
             for j in 0..4 {
                 assert!(float_equal(INVERSE[i][j], EXPECTED[i][j], 1e-5))
@@ -865,48 +981,11 @@ mod const_tests {
             [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0000000025],
         ];
 
-        const INVERSE: [[f64; 8]; 8] = SMatrix::new(START).pinv(f64::EPSILON).finish();
+        const INVERSE: [[f64; 8]; 8] = CMatrix::new(START).pinv(f64::EPSILON).finish();
         for i in 0..8 {
             for j in 0..8 {
                 assert!(float_equal(INVERSE[i][j], EXPECTED[i][j], 1e-5))
             }
         }
-    }
-
-    #[test]
-    fn const_add() {
-        const LEFT: SMatrix<3, 3> =
-            SMatrix::new([[1.0, 0.0, 1.0], [2.0, 1.0, 1.0], [0.0, 1.0, 1.0]]);
-        const RIGHT: SMatrix<3, 3> =
-            SMatrix::new([[1.0, 2.0, 1.0], [2.0, 3.0, 1.0], [4.0, 2.0, 2.0]]);
-        const EXPECTED: [[f64; 3]; 3] = [[2.0, 2.0, 2.0], [4.0, 4.0, 2.0], [4.0, 3.0, 3.0]];
-
-        const RESULT: [[f64; 3]; 3] = LEFT.add(RIGHT).finish();
-
-        assert_eq!(EXPECTED, RESULT);
-    }
-
-    #[test]
-    fn const_non_square_mul() {
-        const LEFT: SMatrix<4, 3> = SMatrix::new([
-            [1.0, 0.0, 1.0],
-            [2.0, 1.0, 1.0],
-            [0.0, 1.0, 1.0],
-            [1.0, 1.0, 2.0],
-        ]);
-
-        const RIGHT: SMatrix<3, 3> =
-            SMatrix::new([[1.0, 2.0, 1.0], [2.0, 3.0, 1.0], [4.0, 2.0, 2.0]]);
-
-        const EXPECTED: [[f64; 3]; 4] = [
-            [5.0, 4.0, 3.0],
-            [8.0, 9.0, 5.0],
-            [6.0, 5.0, 3.0],
-            [11.0, 9.0, 6.0],
-        ];
-
-        const RESULT: [[f64; 3]; 4] = LEFT.mul(RIGHT).finish();
-
-        assert_eq!(EXPECTED, RESULT);
     }
 }
