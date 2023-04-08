@@ -2,4 +2,4 @@
 pub mod runtime;
 
 mod comptime;
-pub use comptime::*;
+pub use comptime::CMatrix;
