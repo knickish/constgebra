@@ -5,7 +5,7 @@
 [crates_img]: https://img.shields.io/crates/v/constgebra.svg
 [crates_lnk]: https://crates.io/crates/constgebra
 
-Do your math ahead of time and embed the result in the binary. Floating-point code is from `compiler_builtins` and `libm` via the [const_soft_float](https://crates.io/crates/const_soft_float) crate. Uses const generics to check shape of inputs.
+Do your math ahead of time and embed the result in the binary. Floating-point code is from `compiler_builtins` and `libm` via the [const_soft_float](https://crates.io/crates/const_soft_float) crate. Uses const generics to check shape of inputs, and is `no_std`.
 
 Please file an issue or make a test PR if your use case is not supported.
 

@@ -359,7 +359,7 @@ impl<const R: usize, const C: usize> CMatrix<R, C> {
                 panic!("failed to get sign of value")
             };
             match cmp {
-                std::cmp::Ordering::Less => Sf64(-1.0),
+                core::cmp::Ordering::Less => Sf64(-1.0),
                 _ => Sf64(1.0),
             }
         }
@@ -841,7 +841,7 @@ const fn abs(x: Sf64) -> Sf64 {
         panic!("failed to get sign of value")
     };
     match cmp {
-        std::cmp::Ordering::Less => x.neg(),
+        core::cmp::Ordering::Less => x.neg(),
         _ => x,
     }
 }
@@ -850,28 +850,28 @@ const fn gt(x: Sf64, y: Sf64) -> bool {
     let Some(cmp) = x.cmp(y) else {
         panic!("failed to compare values")
     };
-    matches!(cmp, std::cmp::Ordering::Greater)
+    matches!(cmp, core::cmp::Ordering::Greater)
 }
 
 const fn lt(x: Sf64, y: Sf64) -> bool {
     let Some(cmp) = x.cmp(y) else {
         panic!("failed to compare values")
     };
-    matches!(cmp, std::cmp::Ordering::Less)
+    matches!(cmp, core::cmp::Ordering::Less)
 }
 
 const fn le(x: Sf64, y: Sf64) -> bool {
     let Some(cmp) = x.cmp(y) else {
         panic!("failed to compare values")
     };
-    matches!(cmp, std::cmp::Ordering::Less | std::cmp::Ordering::Equal)
+    matches!(cmp, core::cmp::Ordering::Less | core::cmp::Ordering::Equal)
 }
 
 const fn eq(x: Sf64, y: Sf64) -> bool {
     let Some(cmp) = x.cmp(y) else {
         panic!("failed to compare values")
     };
-    matches!(cmp, std::cmp::Ordering::Equal)
+    matches!(cmp, core::cmp::Ordering::Equal)
 }
 
 #[cfg(test)]
