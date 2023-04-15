@@ -5,8 +5,16 @@ use const_soft_float::soft_f64::SoftF64 as Sf64;
 
 /// A `const` matrix type, with dimensions checked at compile time
 /// for all operations.
-#[derive(Clone, PartialEq, PartialOrd, Copy)]
+#[derive(Clone, Copy, PartialEq, PartialOrd)]
 pub struct CMatrix<const R: usize, const C: usize>([[Sf64; C]; R]);
+
+impl<const R: usize, const C: usize> Default for CMatrix<R, C> {
+    fn default() -> Self {
+        // TODO: Replace this with `::default()` once this PR is merged and released:
+        // https://github.com/823984418/const_soft_float/pull/7
+        Self([[Sf64::from_f64(0.0); C]; R])
+    }
+}
 
 impl<const R: usize, const C: usize> CMatrix<R, C> {
     /// Create a `CMatrix` from a 2D array of `f64`.
