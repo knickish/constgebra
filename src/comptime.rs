@@ -3,6 +3,27 @@
 
 use const_soft_float::soft_f64::SoftF64 as Sf64;
 
+/// Used with `CMatrix::apply_each` to specify an operation, as `const` function
+/// pointers and closures are not yet stable
+pub enum Operation {
+    Mul(f64),
+    Div(f64),
+    Sqrt,
+}
+
+/// A helper type to construct row vectors. `CMatrix` is used
+/// internally, but makes working with 1-dimensional data less verbose.
+/// ```
+/// # use constgebra::CVector;
+/// const ARRAY: [f64; 2] = [4.0, 7.0];
+///
+/// const ROW_VECTOR: CVector::<2> = CVector::new_vector(ARRAY);
+/// const RESULT: [f64; 2] = ROW_VECTOR.finish_vector();
+///
+/// assert_eq!(ARRAY, RESULT)
+/// ```
+pub type CVector<const N: usize> = CMatrix<1, N>;
+
 /// A `const` matrix type, with dimensions checked at compile time
 /// for all operations.
 #[derive(Clone, Copy, PartialEq, PartialOrd)]
@@ -220,11 +241,36 @@ impl<const R: usize, const C: usize> CMatrix<R, C> {
         CMatrix(ret)
     }
 
+    /// Apply an operation to each member of the matrix separately. Especially
+    /// useful for scaling vectors
+    /// ```
+    /// # use constgebra::{CMatrix, Operation};
+    /// const BASE: CMatrix<1, 3> = CMatrix::new([[1.0, 2.0, 3.0]]);
+    /// const MUL: CMatrix<1, 3> = BASE.apply_each(Operation::Mul(3.0));
+    /// assert_eq!([[3.0, 6.0, 9.0]], MUL.finish());
+    pub const fn apply_each(mut self, op: Operation) -> Self {
+        let mut i = 0;
+        while i < R {
+            let mut j = 0;
+            while j < C {
+                self.0[i][j] = match op {
+                    Operation::Mul(val) => self.0[i][j].mul(Sf64(val)),
+                    Operation::Div(val) => self.0[i][j].div(Sf64(val)),
+                    Operation::Sqrt => self.0[i][j].sqrt(),
+                };
+                j += 1;
+            }
+            i += 1;
+        }
+        self
+    }
+
     const fn get(&self, row: usize, column: usize) -> Sf64 {
         self.0[row][column]
     }
 
     #[must_use]
+    // TODO Replace once const_mut_refs are stabilized
     const fn set(self, row: usize, column: usize, value: Sf64) -> Self {
         let mut ret = self.0;
         ret[row][column] = value;
@@ -825,6 +871,36 @@ impl<const R: usize, const C: usize> CMatrix<R, C> {
     }
 }
 
+impl<const N: usize> CMatrix<1, N> {
+    /// Special case of `CMatrix::new` for constructing a CVector
+    /// Always returns a row vector, follow with `transpose` to build
+    /// a column vector
+    /// ```
+    /// # use constgebra::CVector;
+    /// const ARRAY: [f64; 2] = [4.0, 7.0];
+    ///
+    /// const ROWVECTOR: CVector::<2> = CVector::new_vector(ARRAY);
+    pub const fn new_vector(vals: [f64; N]) -> CVector<N> {
+        CMatrix::new([vals])
+    }
+
+    /// Special case of `CMatrix::finish` for use with a CVector,
+    /// returns `[f64 ; N]` instead of `[[f64 ; N]; 1]
+    /// ```rust
+    /// # use constgebra::CVector;
+    /// const ARRAY: [f64; 2] = [4.0, 7.0];
+    ///
+    /// const CVECTOR: CVector::<2> = CVector::new_vector(ARRAY);
+    ///
+    /// const RESULT: [f64; 2] = CVECTOR.finish_vector();
+    ///
+    /// assert_eq!(ARRAY, RESULT)
+    /// ```
+    pub const fn finish_vector(self) -> [f64; N] {
+        self.finish()[0]
+    }
+}
+
 #[cfg(unused)]
 const fn panic_if_ne(val: Sf64, test: f64) {
     if gt(abs(val.sub(Sf64(test))), Sf64(0.00001)) {
@@ -892,6 +968,30 @@ mod const_tests {
             (a, b) if a == -0.0 || b == -0.0 => a + b == 0.0 || -(a + b) == 0.0,
             _ => false,
         }
+    }
+
+    #[test]
+    fn test_cvec() {
+        const VEC_BASE: CVector<3> = CVector::new_vector([1.0, 2.0, 3.0]);
+        const MAT_BASE: CMatrix<1, 3> = CMatrix::new([[1.0, 2.0, 3.0]]);
+
+        assert_eq!(VEC_BASE.finish(), MAT_BASE.finish());
+
+        const ADDED: CVector<3> = VEC_BASE.add(MAT_BASE);
+        const DIVIDED: CVector<3> = ADDED.apply_each(Operation::Div(3.0));
+        assert_eq!(DIVIDED.finish_vector()[2], 2.0)
+    }
+
+    #[test]
+    fn test_apply_each() {
+        const VEC_BASE: CVector<3> = CVector::new_vector([1.0, 2.0, 3.0]);
+        const MAT_BASE: CMatrix<1, 3> = CMatrix::new([[1.0, 2.0, 3.0]]);
+
+        assert_eq!(VEC_BASE.finish(), MAT_BASE.finish());
+
+        const ADDED: CVector<3> = VEC_BASE.add(MAT_BASE);
+        const DIVIDED: CVector<3> = ADDED.apply_each(Operation::Div(3.0));
+        assert_eq!(DIVIDED.finish_vector()[2], 2.0)
     }
 
     #[test]
