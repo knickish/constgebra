@@ -885,7 +885,7 @@ impl<const N: usize> CMatrix<1, N> {
     }
 
     /// Special case of `CMatrix::finish` for use with a CVector,
-    /// returns `[f64 ; N]` instead of `[[f64 ; N]; 1]
+    /// returns `[f64 ; N]` instead of `[[f64 ; N]; 1]`
     /// ```rust
     /// # use constgebra::CVector;
     /// const ARRAY: [f64; 2] = [4.0, 7.0];
