@@ -31,9 +31,7 @@ pub struct CMatrix<const R: usize, const C: usize>([[Sf64; C]; R]);
 
 impl<const R: usize, const C: usize> Default for CMatrix<R, C> {
     fn default() -> Self {
-        // TODO: Replace this with `::default()` once this PR is merged and released:
-        // https://github.com/823984418/const_soft_float/pull/7
-        Self([[Sf64::from_f64(0.0); C]; R])
+        Self::zero()
     }
 }
 
@@ -63,6 +61,53 @@ impl<const R: usize, const C: usize> CMatrix<R, C> {
         CMatrix(ret)
     }
 
+    /// Equivalent to `CMatrix::new` using `const_soft_float::SoftF64`
+    /// instead of `f64.`
+    pub const fn new_from_soft(vals: [[Sf64; C]; R]) -> Self {
+        CMatrix(vals)
+    }
+
+    /// Create a `CMatrix` filled with zeroes.
+    pub const fn zero() -> Self {
+        // TODO: Replace this with `::default()` once this PR is merged and released:
+        // https://github.com/823984418/const_soft_float/pull/7
+        Self([[Sf64::from_f64(0.0); C]; R])
+    }
+
+    /// Create an identity `CMatrix`.
+    ///```rust
+    /// # use constgebra::CMatrix;
+    /// const LEFT: CMatrix<4, 3> = CMatrix::new([
+    ///     [1.0, 0.0, 1.0],
+    ///     [2.0, 1.0, 1.0],
+    ///     [0.0, 1.0, 1.0],
+    ///     [1.0, 1.0, 2.0],
+    /// ]);
+    ///
+    /// const RIGHT: CMatrix<3, 3> = CMatrix::identity();
+    ///
+    /// const EXPECTED: [[f64; 3]; 4] = LEFT.finish();
+    ///
+    /// const RESULT: [[f64; 3]; 4] = LEFT.mul(RIGHT).finish();
+    ///
+    /// assert_eq!(EXPECTED, RESULT);
+    /// ```
+    pub const fn identity() -> Self {
+        let mut ret = Self::zero();
+        let diag_max = match R > C {
+            true => C,
+            false => R,
+        };
+
+        let mut idx = 0;
+        while idx < diag_max {
+            ret.0[idx][idx] = Sf64::from_f64(1.0);
+            idx += 1;
+        }
+
+        ret
+    }
+
     /// Converts a `CMatrix` back into a two-dimensional array.
     /// ```rust
     /// # use constgebra::CMatrix;
@@ -90,6 +135,11 @@ impl<const R: usize, const C: usize> CMatrix<R, C> {
             i += 1
         }
         ret
+    }
+
+    /// `CMatrix::finish`, but returns `const_soft_float::SoftF64`
+    pub const fn finish_soft(self) -> [[Sf64; C]; R] {
+        self.0
     }
 
     const fn rows(&self) -> usize {
@@ -884,6 +934,25 @@ impl<const N: usize> CMatrix<1, N> {
         CMatrix::new([vals])
     }
 
+    pub const fn new_vector_from_soft(vals: [Sf64; N]) -> Self {
+        CMatrix::new_from_soft([vals])
+    }
+
+    /// Dot product of two `CVector` of the same size.
+    /// ```rust
+    /// # use constgebra::{CVector, const_soft_float::soft_f64::SoftF64 as Sf64};
+    /// const LEFT: CVector<3> = CVector::new_vector([1.0, 3.0, -5.0]);
+    /// const RIGHT: CVector<3> = CVector::new_vector([4.0, -2.0, -1.0]);
+    ///
+    /// const EXPECTED: f64 = 3.0;
+    /// const RESULT: f64 = LEFT.dot(RIGHT);
+    ///
+    /// assert_eq!(EXPECTED, RESULT)
+    /// ```
+    pub const fn dot(self, other: Self) -> f64 {
+        self.mul(other.transpose()).get(0, 0).to_f64()
+    }
+
     /// Special case of `CMatrix::finish` for use with a CVector,
     /// returns `[f64 ; N]` instead of `[[f64 ; N]; 1]`
     /// ```rust
@@ -898,6 +967,11 @@ impl<const N: usize> CMatrix<1, N> {
     /// ```
     pub const fn finish_vector(self) -> [f64; N] {
         self.finish()[0]
+    }
+
+    /// `CVector::finish_vector`, but returns soft floats
+    pub const fn finish_vector_soft(self) -> [Sf64; N] {
+        self.finish_soft()[0]
     }
 }
 
@@ -992,6 +1066,52 @@ mod const_tests {
         const ADDED: CVector<3> = VEC_BASE.add(MAT_BASE);
         const DIVIDED: CVector<3> = ADDED.apply_each(Operation::Div(3.0));
         assert_eq!(DIVIDED.finish_vector()[2], 2.0)
+    }
+
+    #[test]
+    fn test_dot_product_normal() {
+        const VEC1: CVector<3> = CVector::new_vector([2.0, 3.0, 4.0]);
+        const VEC2: CVector<3> = CVector::new_vector([1.0, 5.0, 7.0]);
+        const EXPECTED: f64 = 2.0 * 1.0 + 3.0 * 5.0 + 4.0 * 7.0;
+        const RESULT: f64 = VEC1.dot(VEC2);
+        assert_eq!(EXPECTED, RESULT);
+    }
+
+    #[test]
+    fn test_dot_product_zero_vector() {
+        const VEC1: CVector<3> = CVector::new_vector([0.0, 0.0, 0.0]);
+        const VEC2: CVector<3> = CVector::new_vector([1.0, 5.0, 7.0]);
+        const EXPECTED: f64 = 0.0;
+        const RESULT: f64 = VEC1.dot(VEC2);
+        assert_eq!(EXPECTED, RESULT);
+    }
+
+    #[test]
+    fn test_dot_product_with_negatives() {
+        const VEC1: CVector<3> = CVector::new_vector([-1.0, -3.0, 5.0]);
+        const VEC2: CVector<3> = CVector::new_vector([4.0, -2.0, -1.0]);
+        const EXPECTED: f64 = (-1.0) * 4.0 + (-3.0) * (-2.0) + 5.0 * (-1.0);
+        const RESULT: f64 = VEC1.dot(VEC2);
+        assert_eq!(EXPECTED, RESULT);
+    }
+
+    #[test]
+    fn test_dot_product_large_values() {
+        const VEC1: CVector<3> = CVector::new_vector([1000000.0, 3000000.0, -5000000.0]);
+        const VEC2: CVector<3> = CVector::new_vector([4000000.0, -2000000.0, -1000000.0]);
+        const EXPECTED: f64 =
+            1000000.0 * 4000000.0 + 3000000.0 * (-2000000.0) + (-5000000.0) * (-1000000.0);
+        const RESULT: f64 = VEC1.dot(VEC2);
+        assert_eq!(EXPECTED, RESULT);
+    }
+
+    #[test]
+    fn test_dot_product_identity() {
+        const VEC1: CVector<3> = CVector::new_vector([1.0, 0.0, 0.0]);
+        const VEC2: CVector<3> = CVector::new_vector([0.0, 1.0, 0.0]);
+        const EXPECTED: f64 = 0.0;
+        const RESULT: f64 = VEC1.dot(VEC2);
+        assert_eq!(EXPECTED, RESULT);
     }
 
     #[test]
